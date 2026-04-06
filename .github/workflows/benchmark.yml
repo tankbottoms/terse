@@ -1,0 +1,48 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - skills/terse/SKILL.md
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run benchmark
+        id: bench
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          OUTPUT=$(bun run src/cli.ts bench --trials 1 --json)
+          echo "$OUTPUT"
+          AVG_SAVINGS=$(echo "$OUTPUT" | bun -e "
+            const chunks = [];
+            process.stdin.on('data', c => chunks.push(c));
+            process.stdin.on('end', () => {
+              const data = JSON.parse(chunks.join(''));
+              console.log(data.summary.avgSavings);
+            });
+          " <<< "$OUTPUT")
+          echo "avg_savings=$AVG_SAVINGS" >> $GITHUB_OUTPUT
+
+      - name: Check savings threshold
+        run: |
+          AVG=${{ steps.bench.outputs.avg_savings }}
+          echo "Average savings: ${AVG}%"
+          if (( $(echo "$AVG < 50" | bc -l) )); then
+            echo "FAIL: Average savings ${AVG}% is below the 50% threshold."
+            exit 1
+          fi
+          echo "PASS: Average savings ${AVG}% meets the 50% threshold."

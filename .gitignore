@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tgz
+benchmarks/results/*.json
+.env
+.env.local
+/terse
+/terse-macos
+/terse-linux
+.DS_Store
+reference/
+__pycache__/
+*.pyc
+.venv/
